@@ -148,29 +148,39 @@ class OpenRouterClient:
             return {"error": str(e)}       
 
     def get_balance(self):
-        """
-        Получение текущего баланса аккаунта.
-        
-        Returns:
-            str: Строка с балансом в формате '$X.XX' или 'Ошибка' при неудаче
-        """
-        try:
-            # Запрос баланса через API
-            response = requests.get(
-                f"{self.base_url}/credits",  # Эндпоинт для проверки баланса
-                headers=self.headers         # Заголовки с авторизацией
-            )
-            # Получение данных из ответа
-            data = response.json()
-            if data:
-                data = data.get('data')
-                # Вычисление доступного баланса (всего кредитов минус использовано)
-                return f"${(data.get('total_credits', 0)-data.get('total_usage', 0)):.2f}"
-            return "Ошибка"
-        except Exception as e:
-            # Формирование сообщения об ошибке
-            error_msg = f"API request failed: {str(e)}"
-            # Логирование ошибки с полным стектрейсом
-            self.logger.error(error_msg, exc_info=True)
-            # Возврат сообщения об ошибке
-            return "Ошибка"
+    """
+    Получение текущего баланса аккаунта.
+    
+    Returns:
+        str: Строка с балансом в формате '$X.XX' или 'Ошибка' при неудаче
+    """
+    try:
+        # Запрос баланса через API
+        response = requests.get(
+            f"{self.base_url}/credits",  # Эндпоинт для проверки баланса
+            headers=self.headers         # Заголовки с авторизацией
+        )
+        # Получение данных из ответа
+        data = response.json()
+        if data:
+            data = data.get('data')
+            # Вычисление доступного баланса (всего кредитов минус использовано)
+            balance = data.get('total_credits', 0) - data.get('total_usage', 0)
+            balance_str = f"${balance:.2f}"
+
+            # Проверка баланса и отправка уведомления, если он ниже порога
+            if balance < 10:  # Пороговое значение баланса
+                send_email_notification(
+                    subject="Низкий баланс на OpenRouter",
+                    message=f"Ваш баланс на OpenRouter составляет {balance_str}. Пожалуйста, пополните счет."
+                )
+
+            return balance_str
+        return "Ошибка"
+    except Exception as e:
+        # Формирование сообщения об ошибке
+        error_msg = f"API request failed: {str(e)}"
+        # Логирование ошибки с полным стектрейсом
+        self.logger.error(error_msg, exc_info=True)
+        # Возврат сообщения об ошибке
+        return "Ошибка"
